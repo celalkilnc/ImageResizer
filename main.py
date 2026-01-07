@@ -36,6 +36,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         self.resizer = ImageResizer()
         self.resizer_source_dir = ""
         self.resizer_dest_dir = ""
+        self.is_running = False
 
         # --- Folder Selection Frame ---
         self.frame_folders = ctk.CTkFrame(self.tab_resizer)
@@ -72,11 +73,19 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         modes = [("Percentage %", "percentage"), ("Width (px)", "width"), ("Height (px)", "height"), ("Max (px)", "max"), ("Fit (WxH)", "fit")]
         
         for i, (text, mode) in enumerate(modes):
-            rb = ctk.CTkRadioButton(self.frame_options, text=text, variable=self.resize_mode, value=mode, command=self.update_input_label)
+            rb = ctk.CTkRadioButton(self.frame_options, text=text, variable=self.resize_mode, value=mode, command=self.update_input_fields)
             rb.grid(row=1, column=i, padx=5, pady=5)
 
-        self.entry_value = ctk.CTkEntry(self.frame_options, placeholder_text="50")
-        self.entry_value.grid(row=2, column=0, columnspan=5, padx=10, pady=(5, 10), sticky="ew")
+        # Inputs Frame (Dynamic)
+        self.frame_inputs = ctk.CTkFrame(self.frame_options, fg_color="transparent")
+        self.frame_inputs.grid(row=2, column=0, columnspan=5, padx=10, pady=(5, 10), sticky="ew")
+        
+        self.entry_value1 = ctk.CTkEntry(self.frame_inputs, placeholder_text="50")
+        self.entry_value1.pack(side="left", expand=True, fill="x", padx=(0, 5))
+        
+        self.entry_value2 = ctk.CTkEntry(self.frame_inputs, placeholder_text="Height")
+        self.entry_value2.pack(side="left", expand=True, fill="x", padx=(5, 0))
+        self.entry_value2.pack_forget() # Initially hidden
 
         # Settings (Quality, Format, Checks)
         self.frame_settings = ctk.CTkFrame(self.tab_resizer)
@@ -101,26 +110,26 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         self.check_no_enlarge.grid(row=1, column=0, columnspan=2, padx=10, pady=10, sticky="w")
         
         self.check_skip_vertical = ctk.CTkCheckBox(self.frame_settings, text="Skip Vertical")
-        self.check_skip_vertical.grid(row=1, column=2, columnspan=2, padx=10, pady=10, sticky="w")
+        self.check_skip_vertical.grid(row=1, column=2, columnspan=1, padx=10, pady=10, sticky="w")
+
+        self.check_skip_horizontal = ctk.CTkCheckBox(self.frame_settings, text="Skip Horizontal")
+        self.check_skip_horizontal.grid(row=1, column=3, columnspan=1, padx=10, pady=10, sticky="w")
 
         # --- Action Frame ---
         self.frame_action = ctk.CTkFrame(self.tab_resizer)
         self.frame_action.grid(row=3, column=0, padx=10, pady=10, sticky="ew")
         
-        self.btn_start = ctk.CTkButton(self.frame_action, text="Start Resizing", command=self.start_resizer, fg_color="green", height=40)
-        self.btn_start.pack(side="left", padx=10, pady=10, expand=True, fill="x")
-
-        self.btn_cancel = ctk.CTkButton(self.frame_action, text="Cancel", command=self.cancel_resizer, fg_color="red", state="disabled", height=40)
-        self.btn_cancel.pack(side="left", padx=10, pady=10, expand=True, fill="x")
+        self.btn_toggle = ctk.CTkButton(self.frame_action, text="Start Resizing", command=self.toggle_process, fg_color="green", height=40, width=150)
+        self.btn_toggle.pack(side="left", padx=10, pady=10)
         
         self.progress_bar = ctk.CTkProgressBar(self.frame_action)
-        self.progress_bar.pack(side="bottom", padx=10, pady=5, expand=True, fill="x")
-        self.progress_bar.set(0)
+        # Initially hidden
+        # self.progress_bar.pack(side="left", padx=10, pady=10, expand=True, fill="x")
 
         # --- Log ---
-        self.textbox_log = ctk.CTkTextbox(self.tab_resizer)
+        self.textbox_log = ctk.CTkTextbox(self.tab_resizer, state="disabled")
         self.textbox_log.grid(row=4, column=0, padx=10, pady=10, sticky="nsew")
-        self.textbox_log.insert("0.0", "Resizer Ready...\n")
+        # self.textbox_log.insert("0.0", "Resizer Ready...\n") # Can't insert if disabled, need helper
 
     def setup_cleaner_tab(self):
         self.tab_cleaner.grid_columnconfigure(0, weight=1)
@@ -207,21 +216,33 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
             self.entry_dest.delete(0, "end")
             self.entry_dest.insert(0, path)
 
-    def update_input_label(self):
+    def update_input_fields(self):
         mode = self.resize_mode.get()
-        if mode == "percentage":
-            self.entry_value.configure(placeholder_text="e.g. 50 for 50%")
-        elif mode == "fit":
-            self.entry_value.configure(placeholder_text="e.g. 1024x768")
+        if mode == "fit":
+            self.entry_value1.configure(placeholder_text="Width (px)")
+            self.entry_value2.pack(side="left", expand=True, fill="x", padx=(5, 0))
+            self.entry_value2.configure(placeholder_text="Height (px)")
         else:
-            self.entry_value.configure(placeholder_text="e.g. 1920")
+            self.entry_value2.pack_forget()
+            if mode == "percentage":
+                self.entry_value1.configure(placeholder_text="e.g. 50 for 50%")
+            else:
+                self.entry_value1.configure(placeholder_text="e.g. 1920")
 
     def update_quality_label(self, value):
         self.lbl_quality.configure(text=f"Quality: {int(value)}")
 
     def log_resizer(self, message):
+        self.textbox_log.configure(state="normal")
         self.textbox_log.insert("end", message + "\n")
         self.textbox_log.see("end")
+        self.textbox_log.configure(state="disabled")
+
+    def toggle_process(self):
+        if self.is_running:
+            self.cancel_resizer()
+        else:
+            self.start_resizer()
 
     def start_resizer(self):
         # Update dirs from entries in case user typed/pasted
@@ -234,21 +255,26 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
 
         try:
             if self.resize_mode.get() == "fit":
-                val_str = self.entry_value.get().lower().replace('x', ' ').replace(',', ' ')
-                parts = val_str.split()
-                if len(parts) != 2:
-                    raise ValueError("For Fit mode, enter Width x Height (e.g. 1024x768)")
-                val = (int(parts[0]), int(parts[1]))
+                w = int(self.entry_value1.get())
+                h = int(self.entry_value2.get())
+                val = (w, h)
             else:
-                val = int(self.entry_value.get())
+                val = int(self.entry_value1.get())
         except ValueError as e:
             messagebox.showerror("Error", f"Invalid input: {e}")
             return
 
+        self.is_running = True
+        self.btn_toggle.configure(text="Cancel", fg_color="red")
         self.toggle_resizer_ui("disabled")
-        self.btn_cancel.configure(state="normal")
+        
+        self.progress_bar.pack(side="left", padx=10, pady=10, expand=True, fill="x")
         self.progress_bar.set(0)
+        
+        self.textbox_log.configure(state="normal")
         self.textbox_log.delete("0.0", "end")
+        self.textbox_log.configure(state="disabled")
+        
         self.log_resizer("Starting...")
         
         self.resizer.stop_event.clear()
@@ -259,6 +285,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
             'quality': int(self.slider_quality.get()),
             'no_enlarge': self.check_no_enlarge.get(),
             'skip_vertical': self.check_skip_vertical.get(),
+            'skip_horizontal': self.check_skip_horizontal.get(),
             'output_format': self.option_format.get()
         }
 
@@ -268,7 +295,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
     def cancel_resizer(self):
         self.resizer.stop()
         self.log_resizer("Stopping...")
-        self.btn_cancel.configure(state="disabled")
+        # State will be reset in run_resizer_thread finally block
 
     def run_resizer_thread(self, params):
         try:
@@ -279,23 +306,27 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
                 progress_callback=self.progress_bar.set,
                 log_callback=self.log_resizer
             )
-            self.log_resizer("Completed Successfully!")
-            messagebox.showinfo("Done", "Image resizing completed!")
+            if not self.resizer.stop_event.is_set():
+                self.log_resizer("Completed Successfully!")
+                messagebox.showinfo("Done", "Image resizing completed!")
+            else:
+                self.log_resizer("Cancelled.")
         except Exception as e:
             self.log_resizer(f"Error: {e}")
             messagebox.showerror("Error", str(e))
         finally:
+            self.is_running = False
+            self.btn_toggle.configure(text="Start Resizing", fg_color="green")
             self.toggle_resizer_ui("normal")
-            self.btn_cancel.configure(state="disabled")
+            self.progress_bar.pack_forget()
 
     def toggle_resizer_ui(self, state):
         self.btn_source.configure(state=state)
         self.entry_source.configure(state=state)
         self.btn_dest.configure(state=state)
         self.entry_dest.configure(state=state)
-        # Radio buttons don't have a simple bulk configure, but we can disable the frame or individual
-        # For simplicity, just main buttons
-        self.btn_start.configure(state=state)
+        # Keep button enabled so we can cancel
+        # self.btn_toggle.configure(state=state) 
 
     # --- Cleaner Methods ---
     def select_cleaner_source(self):
@@ -367,10 +398,6 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
                 
                 chk = ctk.CTkCheckBox(frame_file, text=os.path.basename(file_path), variable=var)
                 chk.pack(side="left", padx=5, pady=2)
-                
-                # Helper label for full path tooltip-ish
-                # lbl_path = ctk.CTkLabel(frame_file, text=file_path, text_color="gray", font=("Arial", 10))
-                # lbl_path.pack(side="left", padx=5)
 
     def select_all_duplicates(self):
         for var in self.check_vars.values():
@@ -396,14 +423,11 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
                 os.remove(path)
                 self.log_cleaner(f"Deleted: {path}")
                 deleted_count += 1
-                # Remove widget? Ideally refresh list, but for now just log.
-                # To remove widget we'd need to map path to widget.
             except Exception as e:
                 self.log_cleaner(f"Error deleting {path}: {e}")
         
         messagebox.showinfo("Done", f"Deleted {deleted_count} files.")
-        # Refresh list to remove deleted items visually
-        self.start_scan() # Re-scan is safest to update UI correctly
+        self.start_scan()
 
 if __name__ == "__main__":
     app = App()

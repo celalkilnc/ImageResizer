@@ -63,6 +63,9 @@ class ImageResizer:
             if params.get('skip_vertical') and original_height > original_width:
                 return # Skip vertical image
 
+            if params.get('skip_horizontal') and original_width > original_height:
+                return # Skip horizontal image
+
             new_width, new_height = original_width, original_height
 
             mode = params.get('mode')
