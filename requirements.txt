@@ -1,3 +1,7 @@
 Pillow
 customtkinter
 packaging
+ImageHash
+numpy
+pyinstaller
+tkinterdnd2
