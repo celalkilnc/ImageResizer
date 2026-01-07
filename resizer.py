@@ -100,7 +100,25 @@ class ImageResizer:
             img_resized = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
             
             quality = params.get('quality', 95)
-            img_resized.save(dest_path, quality=quality)
+            output_format = params.get('output_format', 'Original')
+            
+            save_kwargs = {'quality': quality}
+            
+            if output_format != 'Original':
+                # Change extension
+                root, ext = os.path.splitext(dest_path)
+                dest_path = root + '.' + output_format.lower()
+                
+                # Handle format specific requirements
+                if output_format == 'JPG':
+                    if img_resized.mode in ('RGBA', 'P'):
+                        img_resized = img_resized.convert('RGB')
+                elif output_format == 'WEBP':
+                    save_kwargs['quality'] = quality # WebP also uses quality
+                elif output_format == 'PNG':
+                    save_kwargs.pop('quality', None) # PNG is lossless, doesn't use quality param in same way (uses compress_level)
+
+            img_resized.save(dest_path, **save_kwargs)
 
     def stop(self):
         self.stop_event.set()

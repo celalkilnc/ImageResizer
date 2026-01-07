@@ -77,6 +77,14 @@ class App(ctk.CTk):
         self.check_skip_vertical = ctk.CTkCheckBox(self.frame_options, text="Skip Vertical Images")
         self.check_skip_vertical.grid(row=3, column=2, columnspan=3, padx=10, pady=10, sticky="w")
 
+        # Output Format
+        self.lbl_format = ctk.CTkLabel(self.frame_options, text="Output Format:")
+        self.lbl_format.grid(row=4, column=0, padx=10, pady=10, sticky="w")
+
+        self.option_format = ctk.CTkOptionMenu(self.frame_options, values=["JPG", "PNG", "WEBP", "Original"])
+        self.option_format.set("JPG")
+        self.option_format.grid(row=4, column=1, columnspan=2, padx=10, pady=10, sticky="w")
+
         # Progress and Action
         self.frame_action = ctk.CTkFrame(self)
         self.frame_action.grid(row=3, column=0, padx=20, pady=10, sticky="ew")
@@ -158,7 +166,8 @@ class App(ctk.CTk):
             'value': val,
             'quality': int(self.slider_quality.get()),
             'no_enlarge': self.check_no_enlarge.get(),
-            'skip_vertical': self.check_skip_vertical.get()
+            'skip_vertical': self.check_skip_vertical.get(),
+            'output_format': self.option_format.get()
         }
 
         thread = threading.Thread(target=self.run_resizer, args=(params,))
@@ -199,6 +208,7 @@ class App(ctk.CTk):
         self.slider_quality.configure(state=state)
         self.check_no_enlarge.configure(state=state)
         self.check_skip_vertical.configure(state=state)
+        self.option_format.configure(state=state)
         self.btn_start.configure(state=state)
 
 if __name__ == "__main__":
