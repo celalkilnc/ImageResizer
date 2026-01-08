@@ -66,6 +66,10 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         self.entry_dest.grid(row=1, column=1, padx=10, pady=10, sticky="ew")
         self.entry_dest.drop_target_register(DND_ALL)
         self.entry_dest.dnd_bind('<<Drop>>', self.drop_dest)
+        
+        # Bind events for validation
+        self.entry_source.bind("<KeyRelease>", self.validate_inputs)
+        self.entry_dest.bind("<KeyRelease>", self.validate_inputs)
 
         # --- Options Frame ---
         self.frame_options = ctk.CTkFrame(self.tab_resizer)
@@ -92,6 +96,10 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         self.entry_value2 = ctk.CTkEntry(self.frame_inputs, placeholder_text="Height")
         self.entry_value2.pack(side="left", expand=True, fill="x", padx=(5, 0))
         self.entry_value2.pack_forget() # Initially hidden
+        
+        # Bind events for validation
+        self.entry_value1.bind("<KeyRelease>", self.validate_inputs)
+        self.entry_value2.bind("<KeyRelease>", self.validate_inputs)
 
         # Settings (Quality, Format, Checks)
         self.frame_settings = ctk.CTkFrame(self.tab_resizer)
@@ -125,7 +133,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         self.frame_action = ctk.CTkFrame(self.tab_resizer)
         self.frame_action.grid(row=3, column=0, padx=10, pady=10, sticky="ew")
         
-        self.btn_toggle = ctk.CTkButton(self.frame_action, text="Start Resizing", command=self.toggle_process, fg_color="green", height=40, width=150)
+        self.btn_toggle = ctk.CTkButton(self.frame_action, text="Start Resizing", command=self.toggle_process, fg_color="gray", state="disabled", height=40, width=150)
         self.btn_toggle.pack(side="left", padx=10, pady=10)
         
         self.progress_bar = ctk.CTkProgressBar(self.frame_action)
@@ -194,12 +202,14 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         self.resizer_source_dir = path
         self.entry_source.delete(0, "end")
         self.entry_source.insert(0, path)
+        self.validate_inputs()
 
     def drop_dest(self, event):
         path = event.data.strip('{}')
         self.resizer_dest_dir = path
         self.entry_dest.delete(0, "end")
         self.entry_dest.insert(0, path)
+        self.validate_inputs()
 
     def drop_cleaner_source(self, event):
         path = event.data.strip('{}')
@@ -214,6 +224,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
             self.resizer_source_dir = path
             self.entry_source.delete(0, "end")
             self.entry_source.insert(0, path)
+            self.validate_inputs()
 
     def select_resizer_dest(self):
         path = filedialog.askdirectory()
@@ -221,6 +232,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
             self.resizer_dest_dir = path
             self.entry_dest.delete(0, "end")
             self.entry_dest.insert(0, path)
+            self.validate_inputs()
 
     def update_input_fields(self):
         mode = self.resize_mode.get()
@@ -234,9 +246,36 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
                 self.entry_value1.configure(placeholder_text="e.g. 50 for 50%")
             else:
                 self.entry_value1.configure(placeholder_text="e.g. 1920")
+        self.validate_inputs()
 
     def update_quality_label(self, value):
         self.lbl_quality.configure(text=f"Quality: {int(value)}")
+
+    def validate_inputs(self, event=None):
+        # Check if running
+        if self.is_running:
+            return
+
+        source = self.entry_source.get().strip()
+        dest = self.entry_dest.get().strip()
+        val1 = self.entry_value1.get().strip()
+        val2 = self.entry_value2.get().strip()
+        mode = self.resize_mode.get()
+
+        is_valid = False
+        
+        if source and dest:
+            if mode == "fit":
+                if val1 and val2:
+                    is_valid = True
+            else:
+                if val1:
+                    is_valid = True
+        
+        if is_valid:
+            self.btn_toggle.configure(state="normal", fg_color="green")
+        else:
+            self.btn_toggle.configure(state="disabled", fg_color="gray")
 
     def log_resizer(self, message):
         self.textbox_log.configure(state="normal")
@@ -324,6 +363,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
             self.is_running = False
             self.btn_toggle.configure(text="Start Resizing", fg_color="green")
             self.toggle_resizer_ui("normal")
+            self.validate_inputs() # Re-validate to set correct state
             self.progress_bar.pack_forget()
 
     def toggle_resizer_ui(self, state):
