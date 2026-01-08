@@ -17,6 +17,12 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         self.title("Image Resizer & Cleaner Pro")
         self.geometry("800x700")
         
+        # Set Icon
+        try:
+            self.iconbitmap("icon.ico")
+        except Exception:
+            pass # Icon might not be available in dev env or linux
+        
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
