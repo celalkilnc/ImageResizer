@@ -43,7 +43,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         self.setup_cleaner_tab()
 
         # --- Bottom Settings Button ---
-        self.btn_settings = ctk.CTkButton(self, text="⚙", width=40, height=40, command=self.open_settings, font=("Arial", 24), fg_color="transparent", text_color=("gray10", "gray90"), hover_color=("gray70", "gray30"))
+        self.btn_settings = ctk.CTkButton(self, text="⚙", width=30, height=30, command=self.open_settings, font=("Arial", 20), fg_color="transparent", text_color=("gray10", "gray90"), hover_color=("gray70", "gray30"))
         self.btn_settings.grid(row=1, column=0, padx=20, pady=(0, 20), sticky="e")
 
     def t(self, key):
@@ -253,7 +253,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
 
         # Color Theme
         ctk.CTkLabel(self.settings_window, text=self.t("color_theme")).pack(pady=(20, 5))
-        self.option_color = ctk.CTkOptionMenu(self.settings_window, values=["blue", "green", "dark-blue"], command=self.change_color_theme)
+        self.option_color = ctk.CTkOptionMenu(self.settings_window, values=["blue", "green", "dark-blue", "red", "violet"], command=self.change_color_theme)
         self.option_color.set(self.config["color_theme"])
         self.option_color.pack(pady=5)
 
@@ -274,6 +274,20 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
             self.config["color_theme"] = choice
             self.save_config()
             messagebox.showinfo(self.t("settings"), self.t("restart_required"))
+            
+    def apply_theme(self):
+        ctk.set_appearance_mode(self.config["theme"])
+        
+        color = self.config["color_theme"]
+        if color in ["blue", "green", "dark-blue"]:
+            ctk.set_default_color_theme(color)
+        else:
+            # Load custom theme
+            try:
+                ctk.set_default_color_theme(os.path.join("themes", f"{color}.json"))
+            except Exception as e:
+                print(f"Failed to load theme {color}: {e}")
+                ctk.set_default_color_theme("blue")
 
     # --- Logic Methods ---
     def drop_source(self, event):
