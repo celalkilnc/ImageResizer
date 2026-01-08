@@ -2,7 +2,6 @@
 
 A powerful, modern desktop application for batch image resizing and duplicate cleaning. Built with Python and CustomTkinter.
 
-![App Icon](icon.ico)
 
 ## Features
 
