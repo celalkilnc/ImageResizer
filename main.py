@@ -7,6 +7,15 @@ from resizer import ImageResizer
 from cleaner import ImageCleaner
 from tkinterdnd2 import TkinterDnD, DND_ALL
 from locales import TRANSLATIONS
+import sys
+
+def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
 
 # Configuration File
 CONFIG_FILE = "config.json"
@@ -25,9 +34,21 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         
         # Set Icon
         try:
-            self.iconbitmap("icon.ico")
-        except Exception:
-            pass
+            # 1. Register App ID first (Essential for Taskbar)
+            try:
+                import ctypes
+                ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("fibula.imageresizer.final.v3")
+            except:
+                pass
+
+            # 2. Set Icon using standard method
+            icon_path = resource_path("icon.ico")
+            if os.path.exists(icon_path):
+                # Apply icon both immediately and with a small delay for CTK reliability
+                self.iconbitmap(icon_path)
+                self.after(300, lambda: self.iconbitmap(icon_path))
+        except Exception as e:
+            print(f"Icon error: {e}")
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1) # Tab view expands
@@ -78,39 +99,48 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         self.resizer_dest_dir = ""
         self.is_running = False
 
-        # --- Folder Selection Frame ---
-        self.frame_folders = ctk.CTkFrame(self.tab_resizer)
-        self.frame_folders.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
-        self.frame_folders.grid_columnconfigure(1, weight=1)
-
-        # Source
-        self.btn_source = ctk.CTkButton(self.frame_folders, text=self.t("source_folder"), command=self.select_resizer_source)
-        self.btn_source.grid(row=0, column=0, padx=10, pady=10)
+        # --- Folder Selection ---
+        self.frame_folders = ctk.CTkFrame(self.tab_resizer, fg_color="transparent")
+        self.frame_folders.grid(row=0, column=0, padx=25, pady=(25, 10), sticky="ew")
         
-        self.entry_source = ctk.CTkEntry(self.frame_folders, placeholder_text=self.t("drag_source"))
-        self.entry_source.grid(row=0, column=1, padx=10, pady=10, sticky="ew")
+        # Source
+        ctk.CTkLabel(self.frame_folders, text=self.t("source_folder").upper(), font=("Arial", 11, "bold"), text_color="gray60").pack(anchor="w", padx=5)
+        self.f_src = ctk.CTkFrame(self.frame_folders, fg_color="transparent")
+        self.f_src.pack(fill="x", pady=(2, 12))
+        
+        self.entry_source = ctk.CTkEntry(self.f_src, placeholder_text=self.t("drag_source"), height=40, border_width=1)
+        self.entry_source.pack(side="left", expand=True, fill="x")
         self.entry_source.drop_target_register(DND_ALL)
         self.entry_source.dnd_bind('<<Drop>>', self.drop_source)
         self.entry_source.bind("<KeyRelease>", self.validate_inputs)
 
+        self.btn_source = ctk.CTkButton(self.f_src, text="📂", width=45, height=40, command=self.select_resizer_source, 
+                                       fg_color=("gray85", "gray25"), hover_color=("gray75", "gray35"), text_color=("black", "white"))
+        self.btn_source.pack(side="left", padx=(8, 0))
+
         # Destination
-        self.btn_dest = ctk.CTkButton(self.frame_folders, text=self.t("dest_folder"), command=self.select_resizer_dest)
-        self.btn_dest.grid(row=1, column=0, padx=10, pady=10)
+        ctk.CTkLabel(self.frame_folders, text=self.t("dest_folder").upper(), font=("Arial", 11, "bold"), text_color="gray60").pack(anchor="w", padx=5)
+        self.f_dst = ctk.CTkFrame(self.frame_folders, fg_color="transparent")
+        self.f_dst.pack(fill="x", pady=(2, 5))
         
-        self.entry_dest = ctk.CTkEntry(self.frame_folders, placeholder_text=self.t("drag_dest"))
-        self.entry_dest.grid(row=1, column=1, padx=10, pady=10, sticky="ew")
+        self.entry_dest = ctk.CTkEntry(self.f_dst, placeholder_text=self.t("drag_dest"), height=40, border_width=1)
+        self.entry_dest.pack(side="left", expand=True, fill="x")
         self.entry_dest.drop_target_register(DND_ALL)
         self.entry_dest.dnd_bind('<<Drop>>', self.drop_dest)
         self.entry_dest.bind("<KeyRelease>", self.validate_inputs)
 
-        # --- Options Frame ---
-        self.frame_options = ctk.CTkFrame(self.tab_resizer)
-        self.frame_options.grid(row=1, column=0, padx=10, pady=10, sticky="ew")
-        
-        # Resize Mode
-        #self.lbl_mode = ctk.CTkLabel(self.frame_options, text=self.t("resize_mode"), font=("Arial", 12, "bold"))
-        #self.lbl_mode.grid(row=0, column=0, padx=10, pady=(10, 5), sticky="w")
+        self.btn_dest = ctk.CTkButton(self.f_dst, text="🎯", width=45, height=40, command=self.select_resizer_dest,
+                                     fg_color=("gray85", "gray25"), hover_color=("gray75", "gray35"), text_color=("black", "white"))
+        self.btn_dest.pack(side="left", padx=(8, 0))
 
+        # --- Settings & Options Combined Frame ---
+        self.frame_config = ctk.CTkFrame(self.tab_resizer)
+        self.frame_config.grid(row=1, column=0, padx=15, pady=7, sticky="ew")
+        self.frame_config.grid_columnconfigure((0,1,2,3), weight=1)
+
+        ctk.CTkLabel(self.frame_config, text=self.t("group_settings"), font=("Arial", 14, "bold")).grid(row=0, column=0, columnspan=4, padx=15, pady=(10, 5), sticky="w")
+        
+        # Resize Mode (Segmented Button)
         self.resize_mode = ctk.StringVar(value="percentage")
         self.modes_dict = {
             self.t("mode_percent"): "percentage",
@@ -120,15 +150,15 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
             self.t("mode_fit"): "fit"
         }
         
-        self.seg_button = ctk.CTkSegmentedButton(self.frame_options, 
+        self.seg_button = ctk.CTkSegmentedButton(self.frame_config, 
                                                 values=list(self.modes_dict.keys()),
                                                 command=self.on_mode_change)
         self.seg_button.set(self.t("mode_percent"))
-        self.seg_button.grid(row=1, column=0, columnspan=5, padx=10, pady=(5, 15), sticky="ew")
+        self.seg_button.grid(row=1, column=0, columnspan=4, padx=15, pady=10, sticky="ew")
 
         # Inputs Frame (Dynamic)
-        self.frame_inputs = ctk.CTkFrame(self.frame_options, fg_color="transparent")
-        self.frame_inputs.grid(row=2, column=0, columnspan=5, padx=10, pady=(5, 10), sticky="ew")
+        self.frame_inputs = ctk.CTkFrame(self.frame_config, fg_color="transparent")
+        self.frame_inputs.grid(row=2, column=0, columnspan=4, padx=15, pady=(0, 10), sticky="ew")
         
         self.entry_value1 = ctk.CTkEntry(self.frame_inputs, placeholder_text="50")
         self.entry_value1.pack(side="left", expand=True, fill="x", padx=(0, 5))
@@ -136,48 +166,49 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         
         self.entry_value2 = ctk.CTkEntry(self.frame_inputs, placeholder_text="Height")
         self.entry_value2.pack(side="left", expand=True, fill="x", padx=(5, 0))
-        self.entry_value2.pack_forget() # Initially hidden
+        self.entry_value2.pack_forget()
         self.entry_value2.bind("<KeyRelease>", self.validate_inputs)
 
-        # --- Settings Frame (Quality, Format, Checks) ---
-        self.frame_settings = ctk.CTkFrame(self.tab_resizer)
-        self.frame_settings.grid(row=2, column=0, padx=10, pady=10, sticky="ew")
+        # Quality & Format Row
+        self.lbl_quality = ctk.CTkLabel(self.frame_config, text=f"{self.t('quality')} 95")
+        self.lbl_quality.grid(row=3, column=0, padx=(15, 5), pady=5, sticky="w")
         
-        # Quality
-        self.lbl_quality = ctk.CTkLabel(self.frame_settings, text=f"{self.t('quality')} 95")
-        self.lbl_quality.grid(row=0, column=0, padx=10, pady=5, sticky="w")
-        self.slider_quality = ctk.CTkSlider(self.frame_settings, from_=1, to=100, number_of_steps=99, command=self.update_quality_label)
+        self.slider_quality = ctk.CTkSlider(self.frame_config, from_=1, to=100, number_of_steps=99, command=self.update_quality_label)
         self.slider_quality.set(95)
-        self.slider_quality.grid(row=0, column=1, padx=10, pady=5, sticky="ew")
+        self.slider_quality.grid(row=3, column=1, padx=5, pady=5, sticky="ew")
 
-        # Format
-        ctk.CTkLabel(self.frame_settings, text=self.t("format")).grid(row=0, column=2, padx=10, pady=5, sticky="e")
-        self.option_format = ctk.CTkOptionMenu(self.frame_settings, values=["JPG", "PNG", "WEBP", "Original"])
+        ctk.CTkLabel(self.frame_config, text=self.t("format")).grid(row=3, column=2, padx=5, pady=5, sticky="e")
+        self.option_format = ctk.CTkOptionMenu(self.frame_config, values=["JPG", "PNG", "WEBP", "Original"], width=100)
         self.option_format.set("JPG")
-        self.option_format.grid(row=0, column=3, padx=10, pady=5, sticky="ew")
+        self.option_format.grid(row=3, column=3, padx=(5, 15), pady=5, sticky="ew")
 
-        # Checkboxes
-        self.check_no_enlarge = ctk.CTkCheckBox(self.frame_settings, text=self.t("no_enlarge"))
-        self.check_no_enlarge.grid(row=1, column=0, columnspan=2, padx=10, pady=10, sticky="w")
+        # Checkboxes Container
+        self.frame_checks = ctk.CTkFrame(self.frame_config, fg_color="transparent")
+        self.frame_checks.grid(row=4, column=0, columnspan=4, padx=10, pady=(5, 10), sticky="ew")
+
+        self.check_no_enlarge = ctk.CTkCheckBox(self.frame_checks, text=self.t("no_enlarge"))
+        self.check_no_enlarge.pack(side="left", padx=10, pady=5)
         
-        self.check_skip_vertical = ctk.CTkCheckBox(self.frame_settings, text=self.t("skip_vertical"))
-        self.check_skip_vertical.grid(row=1, column=2, padx=10, pady=10, sticky="w")
+        self.check_skip_vertical = ctk.CTkCheckBox(self.frame_checks, text=self.t("skip_vertical"))
+        self.check_skip_vertical.pack(side="left", padx=10, pady=5)
 
-        self.check_skip_horizontal = ctk.CTkCheckBox(self.frame_settings, text=self.t("skip_horizontal"))
-        self.check_skip_horizontal.grid(row=1, column=3, padx=10, pady=10, sticky="w")
+        self.check_skip_horizontal = ctk.CTkCheckBox(self.frame_checks, text=self.t("skip_horizontal"))
+        self.check_skip_horizontal.pack(side="left", padx=10, pady=5)
 
-        self.check_keep_structure = ctk.CTkCheckBox(self.frame_settings, text=self.t("keep_structure"))
-        self.check_keep_structure.select() # Default to True
-        self.check_keep_structure.grid(row=2, column=0, columnspan=2, padx=10, pady=10, sticky="w")
+        self.check_keep_structure = ctk.CTkCheckBox(self.frame_checks, text=self.t("keep_structure"))
+        self.check_keep_structure.select()
+        self.check_keep_structure.pack(side="left", padx=10, pady=5)
 
         # --- Action Frame ---
-        self.frame_action = ctk.CTkFrame(self.tab_resizer)
-        self.frame_action.grid(row=3, column=0, padx=10, pady=10, sticky="ew")
+        self.frame_action = ctk.CTkFrame(self.tab_resizer, fg_color="transparent")
+        self.frame_action.grid(row=3, column=0, padx=15, pady=5, sticky="ew")
         
-        self.btn_toggle = ctk.CTkButton(self.frame_action, text=self.t("start_resizing"), command=self.toggle_process, fg_color="gray", state="disabled", height=40, width=150)
-        self.btn_toggle.pack(side="left", padx=10, pady=10)
+        self.btn_toggle = ctk.CTkButton(self.frame_action, text="🚀 " + self.t("start_resizing"), 
+                                       command=self.toggle_process, fg_color="gray", state="disabled", 
+                                       height=45, font=("Arial", 14, "bold"))
+        self.btn_toggle.pack(side="right", padx=0, pady=5, expand=True, fill="x")
         
-        self.progress_bar = ctk.CTkProgressBar(self.frame_action)
+        self.progress_bar = ctk.CTkProgressBar(self.frame_action, height=12)
         # Initially hidden
 
         # --- Log Areas ---
@@ -370,7 +401,8 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         else:
             # Load custom theme
             try:
-                ctk.set_default_color_theme(os.path.join("themes", f"{color}.json"))
+                theme_path = resource_path(os.path.join("themes", f"{color}.json"))
+                ctk.set_default_color_theme(theme_path)
             except Exception as e:
                 print(f"Failed to load theme {color}: {e}")
                 ctk.set_default_color_theme("blue")
@@ -479,6 +511,41 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         else:
             self.start_resizer()
 
+    def animate_action_section(self, direction="start"):
+        """Animates the button shrinking and progress bar expanding/collapsing with easing."""
+        import math
+        self.anim_steps = 25 # Increased for smoothness
+        self.anim_delay = 10 # ms (approx 100fps)
+        
+        total_width = self.frame_action.winfo_width()
+        if total_width < 100: total_width = 700
+        
+        target_btn_width = 150
+        start_btn_width = total_width
+        
+        if direction == "start":
+            self.progress_bar.pack(side="left", padx=(0, 15), pady=10, expand=True, fill="x")
+            self.btn_toggle.pack_configure(expand=False, fill="none")
+            self._step_animate(0, start_btn_width, target_btn_width)
+        else:
+            self._step_animate(0, target_btn_width, start_btn_width, is_reverting=True)
+
+    def _step_animate(self, current_step, start_w, end_w, is_reverting=False):
+        import math
+        if current_step <= self.anim_steps:
+            # Sinusoidal Ease-in-out formula
+            t = current_step / self.anim_steps
+            easing = -(math.cos(math.pi * t) - 1) / 2
+            
+            current_w = start_w + (end_w - start_w) * easing
+            self.btn_toggle.configure(width=current_w)
+            
+            self.after(self.anim_delay, lambda: self._step_animate(current_step + 1, start_w, end_w, is_reverting))
+        elif is_reverting:
+            self.progress_bar.pack_forget()
+            self.btn_toggle.pack_configure(expand=True, fill="x")
+            self.btn_toggle.configure(width=140)
+
     def start_resizer(self):
         self.resizer_source_dir = self.entry_source.get()
         self.resizer_dest_dir = self.entry_dest.get()
@@ -500,7 +567,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         self.btn_toggle.configure(text=self.t("cancel"), fg_color="red")
         self.toggle_resizer_ui("disabled")
         
-        self.progress_bar.pack(side="left", padx=10, pady=10, expand=True, fill="x")
+        self.animate_action_section("start")
         self.progress_bar.set(0)
         
         self.textbox_log.configure(state="normal")
@@ -553,10 +620,10 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
             messagebox.showerror("Error", str(e))
         finally:
             self.is_running = False
-            self.btn_toggle.configure(text=self.t("start_resizing"), fg_color="green")
+            self.btn_toggle.configure(text="🚀 " + self.t("start_resizing"), fg_color="green")
+            self.animate_action_section("end")
             self.toggle_resizer_ui("normal")
             self.validate_inputs()
-            self.progress_bar.pack_forget()
 
     def toggle_resizer_ui(self, state):
         self.btn_source.configure(state=state)
