@@ -20,7 +20,8 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         self.apply_theme()
 
         self.title(self.t("title"))
-        self.geometry("800x750")
+        self.geometry("800x800")
+        self.minsize(680, 780)
         
         # Set Icon
         try:
@@ -107,21 +108,23 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         self.frame_options.grid(row=1, column=0, padx=10, pady=10, sticky="ew")
         
         # Resize Mode
-        self.lbl_mode = ctk.CTkLabel(self.frame_options, text=self.t("resize_mode"), font=("Arial", 12, "bold"))
-        self.lbl_mode.grid(row=0, column=0, padx=10, pady=5, sticky="w")
+        #self.lbl_mode = ctk.CTkLabel(self.frame_options, text=self.t("resize_mode"), font=("Arial", 12, "bold"))
+        #self.lbl_mode.grid(row=0, column=0, padx=10, pady=(10, 5), sticky="w")
 
         self.resize_mode = ctk.StringVar(value="percentage")
-        modes = [
-            (self.t("mode_percent"), "percentage"), 
-            (self.t("mode_width"), "width"), 
-            (self.t("mode_height"), "height"), 
-            (self.t("mode_max"), "max"), 
-            (self.t("mode_fit"), "fit")
-        ]
+        self.modes_dict = {
+            self.t("mode_percent"): "percentage",
+            self.t("mode_width"): "width",
+            self.t("mode_height"): "height",
+            self.t("mode_max"): "max",
+            self.t("mode_fit"): "fit"
+        }
         
-        for i, (text, mode) in enumerate(modes):
-            rb = ctk.CTkRadioButton(self.frame_options, text=text, variable=self.resize_mode, value=mode, command=self.update_input_fields)
-            rb.grid(row=1, column=i, padx=5, pady=5)
+        self.seg_button = ctk.CTkSegmentedButton(self.frame_options, 
+                                                values=list(self.modes_dict.keys()),
+                                                command=self.on_mode_change)
+        self.seg_button.set(self.t("mode_percent"))
+        self.seg_button.grid(row=1, column=0, columnspan=5, padx=10, pady=(5, 15), sticky="ew")
 
         # Inputs Frame (Dynamic)
         self.frame_inputs = ctk.CTkFrame(self.frame_options, fg_color="transparent")
@@ -163,6 +166,10 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         self.check_skip_horizontal = ctk.CTkCheckBox(self.frame_settings, text=self.t("skip_horizontal"))
         self.check_skip_horizontal.grid(row=1, column=3, padx=10, pady=10, sticky="w")
 
+        self.check_keep_structure = ctk.CTkCheckBox(self.frame_settings, text=self.t("keep_structure"))
+        self.check_keep_structure.select() # Default to True
+        self.check_keep_structure.grid(row=2, column=0, columnspan=2, padx=10, pady=10, sticky="w")
+
         # --- Action Frame ---
         self.frame_action = ctk.CTkFrame(self.tab_resizer)
         self.frame_action.grid(row=3, column=0, padx=10, pady=10, sticky="ew")
@@ -173,9 +180,88 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         self.progress_bar = ctk.CTkProgressBar(self.frame_action)
         # Initially hidden
 
-        # --- Log ---
-        self.textbox_log = ctk.CTkTextbox(self.tab_resizer, state="disabled")
-        self.textbox_log.grid(row=4, column=0, padx=10, pady=10, sticky="nsew")
+        # --- Log Areas ---
+        self.frame_logs = ctk.CTkFrame(self.tab_resizer, fg_color="transparent")
+        self.frame_logs.grid(row=4, column=0, padx=10, pady=10, sticky="nsew")
+        self.frame_logs.bind("<Configure>", self.on_logs_frame_configure)
+        
+        self.log_ratio = 0.5 # Initial ratio
+        self.is_horizontal = True # Current layout orientation
+
+        # Success Log
+        self.textbox_log = ctk.CTkTextbox(self.frame_logs, state="disabled")
+        
+        # Splitter Handle
+        self.splitter_handle = ctk.CTkFrame(self.frame_logs, width=4, cursor="sb_h_double_arrow", fg_color="gray50")
+        self.splitter_handle.bind("<B1-Motion>", self.on_splitter_drag)
+        
+        # Skipped/Error Log
+        self.textbox_skipped = ctk.CTkTextbox(self.frame_logs, state="disabled", text_color="orange")
+        
+        self.update_logs_layout()
+
+    def update_logs_layout(self):
+        width = self.frame_logs.winfo_width()
+        if width < 100: # Initial call or too small
+            width = 800
+            
+        if width < 500: # Stack vertically if narrow
+            if self.is_horizontal:
+                self.is_horizontal = False
+                self.textbox_log.grid_forget()
+                self.splitter_handle.grid_forget()
+                self.textbox_skipped.grid_forget()
+                
+                self.frame_logs.grid_columnconfigure(0, weight=1)
+                self.frame_logs.grid_columnconfigure(1, weight=0)
+                self.frame_logs.grid_columnconfigure(2, weight=0)
+                self.frame_logs.grid_rowconfigure(0, weight=1)
+                self.frame_logs.grid_rowconfigure(2, weight=1)
+                
+                self.textbox_log.grid(row=0, column=0, pady=(0, 5), sticky="nsew")
+                self.textbox_skipped.grid(row=2, column=0, pady=(5, 0), sticky="nsew")
+        else: # Horizontal layout with splitter
+            if not self.is_horizontal:
+                self.is_horizontal = True
+                self.textbox_log.grid_forget()
+                self.textbox_skipped.grid_forget()
+                
+                self.frame_logs.grid_rowconfigure(0, weight=1)
+                self.frame_logs.grid_rowconfigure(2, weight=0)
+            
+            # Update Column Weights based on ratio
+            r1 = int(self.log_ratio * 100)
+            r2 = 100 - r1
+            
+            self.frame_logs.grid_columnconfigure(0, weight=r1)
+            self.frame_logs.grid_columnconfigure(1, weight=0)
+            self.frame_logs.grid_columnconfigure(2, weight=r2)
+            
+            self.textbox_log.grid(row=0, column=0, padx=(0, 2), sticky="nsew")
+            self.splitter_handle.grid(row=0, column=1, sticky="ns", padx=2)
+            self.textbox_skipped.grid(row=0, column=2, padx=(2, 0), sticky="nsew")
+
+    def on_logs_frame_configure(self, event):
+        # Prevent recursion if handled by layout
+        if event.widget == self.frame_logs:
+            self.update_logs_layout()
+
+    def on_splitter_drag(self, event):
+        if not self.is_horizontal: return
+        
+        # Calculate new ratio based on mouse position relative to frame_logs
+        total_width = self.frame_logs.winfo_width()
+        if total_width == 0: return
+        
+        new_ratio = event.x_root - self.frame_logs.winfo_rootx()
+        new_ratio = new_ratio / total_width
+        
+        # Clamping between 0.20 and 0.80
+        if new_ratio < 0.20: new_ratio = 0.20
+        if new_ratio > 0.80: new_ratio = 0.80
+        
+        self.log_ratio = new_ratio
+        self.update_logs_layout()
 
     def setup_cleaner_tab(self):
         self.tab_cleaner.grid_columnconfigure(0, weight=1)
@@ -343,6 +429,11 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
     def update_quality_label(self, value):
         self.lbl_quality.configure(text=f"{self.t('quality')} {int(value)}")
 
+    def on_mode_change(self, selected_text):
+        mode = self.modes_dict.get(selected_text)
+        self.resize_mode.set(mode)
+        self.update_input_fields()
+
     def validate_inputs(self, event=None):
         if self.is_running: return
         source = self.entry_source.get().strip()
@@ -367,6 +458,20 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         self.textbox_log.insert("end", message + "\n")
         self.textbox_log.see("end")
         self.textbox_log.configure(state="disabled")
+
+    def log_skipped(self, filename, reason):
+        self.textbox_skipped.configure(state="normal")
+        
+        # Translate reason if possible
+        translated_reason = reason
+        if reason == "vertical":
+            translated_reason = self.t("skipped_vertical")
+        elif reason == "horizontal":
+            translated_reason = self.t("skipped_horizontal")
+            
+        self.textbox_skipped.insert("end", f"{filename}: {translated_reason}\n")
+        self.textbox_skipped.see("end")
+        self.textbox_skipped.configure(state="disabled")
 
     def toggle_process(self):
         if self.is_running:
@@ -401,6 +506,11 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         self.textbox_log.configure(state="normal")
         self.textbox_log.delete("0.0", "end")
         self.textbox_log.configure(state="disabled")
+
+        self.textbox_skipped.configure(state="normal")
+        self.textbox_skipped.delete("0.0", "end")
+        self.textbox_skipped.insert("end", self.t("skipped_log") + "\n\n")
+        self.textbox_skipped.configure(state="disabled")
         
         self.log_resizer(self.t("starting"))
         self.resizer.stop_event.clear()
@@ -412,6 +522,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
             'no_enlarge': self.check_no_enlarge.get(),
             'skip_vertical': self.check_skip_vertical.get(),
             'skip_horizontal': self.check_skip_horizontal.get(),
+            'keep_structure': self.check_keep_structure.get(),
             'output_format': self.option_format.get()
         }
         thread = threading.Thread(target=self.run_resizer_thread, args=(params,))
@@ -423,16 +534,18 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
 
     def run_resizer_thread(self, params):
         try:
-            self.resizer.resize_images(
+            success_count, skipped_count = self.resizer.resize_images(
                 self.resizer_source_dir, 
                 self.resizer_dest_dir, 
                 params, 
                 progress_callback=self.progress_bar.set,
-                log_callback=self.log_resizer
+                log_callback=self.log_resizer,
+                skip_callback=self.log_skipped
             )
             if not self.resizer.stop_event.is_set():
+                self.log_resizer("\n" + self.t("completed_count").format(success_count))
                 self.log_resizer(self.t("completed"))
-                messagebox.showinfo(self.t("done_title"), self.t("done_msg"))
+                messagebox.showinfo(self.t("done_title"), self.t("completed_count").format(success_count))
             else:
                 self.log_resizer(self.t("cancelled"))
         except Exception as e:

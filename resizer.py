@@ -9,13 +9,15 @@ class ImageResizer:
     def __init__(self):
         self.stop_event = threading.Event()
 
-    def resize_images(self, source_dir, dest_dir, params, progress_callback=None, log_callback=None):
+    def resize_images(self, source_dir, dest_dir, params, progress_callback=None, log_callback=None, skip_callback=None):
         """
         Resizes images from source_dir to dest_dir based on params.
-        params: dict with keys 'mode' ('percentage', 'width', 'height', 'max'), 'value'.
+        params: dict with keys 'mode', 'value', 'keep_structure', etc.
         """
         if not os.path.exists(dest_dir):
             os.makedirs(dest_dir)
+
+        keep_structure = params.get('keep_structure', True)
 
         total_files = 0
         for root, dirs, files in os.walk(source_dir):
@@ -24,14 +26,20 @@ class ImageResizer:
                     total_files += 1
 
         processed_count = 0
+        success_count = 0
+        skipped_count = 0
         
         for root, dirs, files in os.walk(source_dir):
             if self.stop_event.is_set():
                 break
                 
-            # Create corresponding structure in dest_dir
-            relative_path = os.path.relpath(root, source_dir)
-            current_dest_dir = os.path.join(dest_dir, relative_path)
+            if keep_structure:
+                # Create corresponding structure in dest_dir
+                relative_path = os.path.relpath(root, source_dir)
+                current_dest_dir = os.path.join(dest_dir, relative_path)
+            else:
+                # Save everything directly in dest_dir
+                current_dest_dir = dest_dir
             
             if not os.path.exists(current_dest_dir):
                 os.makedirs(current_dest_dir)
@@ -45,26 +53,35 @@ class ImageResizer:
                     dest_path = os.path.join(current_dest_dir, file)
                     
                     try:
-                        self._process_image(source_path, dest_path, params)
-                        if log_callback:
-                            log_callback(f"Processed: {file}")
+                        status, message = self._process_image(source_path, dest_path, params)
+                        if status == "success":
+                            success_count += 1
+                            if log_callback:
+                                log_callback(f"Processed: {file}")
+                        elif status == "skipped":
+                            skipped_count += 1
+                            if skip_callback:
+                                skip_callback(file, message)
                     except Exception as e:
-                        if log_callback:
-                            log_callback(f"Error processing {file}: {e}")
+                        skipped_count += 1
+                        if skip_callback:
+                            skip_callback(file, str(e))
                     
                     processed_count += 1
                     if progress_callback:
                         progress_callback(processed_count / total_files)
+        
+        return success_count, skipped_count
 
     def _process_image(self, source_path, dest_path, params):
         with Image.open(source_path) as img:
             original_width, original_height = img.size
             
             if params.get('skip_vertical') and original_height > original_width:
-                return # Skip vertical image
+                return "skipped", "vertical"
 
             if params.get('skip_horizontal') and original_width > original_height:
-                return # Skip horizontal image
+                return "skipped", "horizontal"
 
             new_width, new_height = original_width, original_height
 
@@ -122,6 +139,7 @@ class ImageResizer:
                     save_kwargs.pop('quality', None) # PNG is lossless, doesn't use quality param in same way (uses compress_level)
 
             img_resized.save(dest_path, **save_kwargs)
+            return "success", None
 
     def stop(self):
         self.stop_event.set()

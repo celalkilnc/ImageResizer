@@ -6,7 +6,7 @@ A powerful, modern desktop application for batch image resizing and duplicate cl
 ## Features
 
 ### 🖼️ Image Resizer
-- **Batch Processing**: Resize thousands of images recursively while preserving folder structure.
+- **Flexible Output**: Resize thousands of images recursively with the option to preserve the original folder structure or flatten everything into a single folder.
 - **Multiple Modes**:
   - **Percentage**: Scale images by % (e.g., 50%).
   - **Width/Height**: Resize to a fixed width or height.
@@ -27,8 +27,10 @@ A powerful, modern desktop application for batch image resizing and duplicate cl
 
 ## Installation
 
-1. Download the latest `ImageResizerPro.exe` from the [Releases](https://github.com/celalkilnc/ImageResizer/releases) page.
-2. Run the executable (No installation required).
+1. Download the latest `ImageResizerPro.exe` (or `.zip`) from the [Releases](https://github.com/celalkilnc/ImageResizer/releases) page.
+2. Run the executable.
+
+> **Note:** Since this application is not digitally signed (which costs money), Windows or your browser might warn you that it is "uncommonly downloaded" or "unsafe". This is a standard warning for new open-source software. You can safely click **"Keep"** -> **"Show more"** -> **"Keep anyway"** (in browser) or **"More Info"** -> **"Run anyway"** (in Windows SmartScreen).
 
 ## Development
 
