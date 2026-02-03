@@ -296,54 +296,70 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
 
     def setup_cleaner_tab(self):
         self.tab_cleaner.grid_columnconfigure(0, weight=1)
-        self.tab_cleaner.grid_rowconfigure(2, weight=1)
+        self.tab_cleaner.grid_rowconfigure(3, weight=1) # Results row expands
 
         self.cleaner = ImageCleaner()
         self.cleaner_source_dir = ""
         self.duplicates = []
         self.check_vars = {}
 
-        # Source Selection
-        self.frame_cleaner_source = ctk.CTkFrame(self.tab_cleaner)
-        self.frame_cleaner_source.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
+        # 1. Source Selection Frame
+        self.frame_cleaner_source = ctk.CTkFrame(self.tab_cleaner, fg_color="transparent")
+        self.frame_cleaner_source.grid(row=0, column=0, padx=25, pady=(25, 10), sticky="ew")
         self.frame_cleaner_source.grid_columnconfigure(1, weight=1)
 
-        self.btn_cleaner_source = ctk.CTkButton(self.frame_cleaner_source, text=self.t("select_folder"), command=self.select_cleaner_source)
-        self.btn_cleaner_source.grid(row=0, column=0, padx=10, pady=10)
+        self.btn_cleaner_source = ctk.CTkButton(self.frame_cleaner_source, text=self.t("select_folder"), 
+                                               command=self.select_cleaner_source, height=40,
+                                               fg_color=("gray85", "gray25"), hover_color=("gray75", "gray35"), text_color=("black", "white"))
+        self.btn_cleaner_source.grid(row=0, column=0, padx=(0, 10), pady=0)
         
-        self.entry_cleaner_source = ctk.CTkEntry(self.frame_cleaner_source, placeholder_text=self.t("drag_source"))
-        self.entry_cleaner_source.grid(row=0, column=1, padx=10, pady=10, sticky="ew")
+        self.entry_cleaner_source = ctk.CTkEntry(self.frame_cleaner_source, placeholder_text=self.t("drag_source"), height=40)
+        self.entry_cleaner_source.grid(row=0, column=1, padx=0, pady=0, sticky="ew")
         self.entry_cleaner_source.drop_target_register(DND_ALL)
         self.entry_cleaner_source.dnd_bind('<<Drop>>', self.drop_cleaner_source)
+        self.entry_cleaner_source.bind("<KeyRelease>", self.validate_cleaner_inputs)
 
-        self.btn_scan = ctk.CTkButton(self.frame_cleaner_source, text=self.t("scan"), command=self.start_scan, fg_color="blue")
-        self.btn_scan.grid(row=0, column=2, padx=10, pady=10)
+        self.btn_scan = ctk.CTkButton(self.frame_cleaner_source, text=self.t("scan"), command=self.start_scan, 
+                                      height=40, state="disabled")
+        self.btn_scan.grid(row=0, column=2, padx=(10, 0), pady=0)
 
-        # Action Bar
-        self.frame_cleaner_actions = ctk.CTkFrame(self.tab_cleaner)
-        self.frame_cleaner_actions.grid(row=1, column=0, padx=10, pady=5, sticky="ew")
+        # 2. Progress Bar (The "Red Line" area)
+        self.cleaner_progress_container = ctk.CTkFrame(self.tab_cleaner, fg_color="transparent")
+        self.cleaner_progress = ctk.CTkProgressBar(self.cleaner_progress_container, height=12)
+        self.cleaner_progress.pack(fill="x", padx=25, pady=10)
+        # Hidden by default
+
+        # 3. Action Bar (Select All / Deselect All / Delete)
+        self.frame_cleaner_actions = ctk.CTkFrame(self.tab_cleaner, fg_color="transparent")
+        # Hidden by default, gridded in row 2
+
+        self.btn_select_all = ctk.CTkButton(self.frame_cleaner_actions, text=self.t("select_all"), 
+                                           command=self.select_all_duplicates, width=120, height=35)
+        self.btn_select_all.pack(side="left", padx=(0, 10), pady=5)
         
-        self.btn_select_all = ctk.CTkButton(self.frame_cleaner_actions, text=self.t("select_all"), command=self.select_all_duplicates, width=100)
-        self.btn_select_all.pack(side="left", padx=10, pady=5)
+        self.btn_deselect_all = ctk.CTkButton(self.frame_cleaner_actions, text=self.t("deselect_all"), 
+                                             command=self.deselect_all_duplicates, width=120, height=35, state="disabled")
+        self.btn_deselect_all.pack(side="left", padx=0, pady=5)
+
+        self.btn_select_first = ctk.CTkButton(self.frame_cleaner_actions, text=self.t("select_first"), 
+                                             command=self.select_others_keep_one, width=160, height=35, 
+                                             fg_color=("orange", "#d48806"), hover_color=("#e69138", "#b37400"), text_color="black")
+        self.btn_select_first.pack(side="left", padx=10, pady=5)
+
+        self.btn_delete_selected = ctk.CTkButton(self.frame_cleaner_actions, text=self.t("delete_selected"), 
+                                                command=self.delete_selected_duplicates, fg_color="#e63946", hover_color="#c1121f",
+                                                height=35, state="disabled")
+        self.btn_delete_selected.pack(side="right", padx=0, pady=5)
+
+        # 4. Results
+        self.frame_results = ctk.CTkScrollableFrame(self.tab_cleaner)
+        self.frame_results.grid(row=3, column=0, padx=20, pady=10, sticky="nsew")
+
+        # 5. Log
+        self.cleaner_log = ctk.CTkTextbox(self.tab_cleaner, height=80, state="disabled")
+        self.cleaner_log.grid(row=4, column=0, padx=20, pady=(0, 10), sticky="ew")
         
-        self.btn_deselect_all = ctk.CTkButton(self.frame_cleaner_actions, text=self.t("deselect_all"), command=self.deselect_all_duplicates, width=100)
-        self.btn_deselect_all.pack(side="left", padx=10, pady=5)
-
-        self.btn_delete_selected = ctk.CTkButton(self.frame_cleaner_actions, text=self.t("delete_selected"), command=self.delete_selected_duplicates, fg_color="red")
-        self.btn_delete_selected.pack(side="right", padx=10, pady=5)
-
-        self.cleaner_progress = ctk.CTkProgressBar(self.frame_cleaner_actions)
-        self.cleaner_progress.pack(side="bottom", padx=10, pady=5, fill="x")
-        self.cleaner_progress.set(0)
-
-        # Results
-        self.frame_results = ctk.CTkScrollableFrame(self.tab_cleaner, label_text=self.t("duplicates_found"))
-        self.frame_results.grid(row=2, column=0, padx=10, pady=10, sticky="nsew")
-
-        # Log
-        self.cleaner_log = ctk.CTkTextbox(self.tab_cleaner, height=80)
-        self.cleaner_log.grid(row=3, column=0, padx=10, pady=10, sticky="ew")
-        self.cleaner_log.insert("0.0", self.t("ready") + "\n")
+        self.log_cleaner(self.t("cleaner_ready"))
 
     # --- Settings Window ---
     def open_settings(self):
@@ -427,6 +443,14 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         self.cleaner_source_dir = path
         self.entry_cleaner_source.delete(0, "end")
         self.entry_cleaner_source.insert(0, path)
+        self.validate_cleaner_inputs()
+
+    def validate_cleaner_inputs(self, event=None):
+        source = self.entry_cleaner_source.get().strip()
+        if source and os.path.isdir(source):
+            self.btn_scan.configure(state="normal")
+        else:
+            self.btn_scan.configure(state="disabled")
 
     def select_resizer_source(self):
         path = filedialog.askdirectory()
@@ -638,10 +662,13 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
             self.cleaner_source_dir = path
             self.entry_cleaner_source.delete(0, "end")
             self.entry_cleaner_source.insert(0, path)
+            self.validate_cleaner_inputs()
 
     def log_cleaner(self, message):
+        self.cleaner_log.configure(state="normal")
         self.cleaner_log.insert("end", message + "\n")
         self.cleaner_log.see("end")
+        self.cleaner_log.configure(state="disabled")
 
     def start_scan(self):
         self.cleaner_source_dir = self.entry_cleaner_source.get()
@@ -650,12 +677,20 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
             return
 
         self.btn_scan.configure(state="disabled")
+        self.cleaner_progress_container.grid(row=1, column=0, sticky="ew")
         self.cleaner_progress.set(0)
+        
+        # Hide actions frame during scan if it was visible
+        self.frame_cleaner_actions.grid_forget()
+        
+        self.cleaner_log.configure(state="normal")
         self.cleaner_log.delete("0.0", "end")
+        self.cleaner_log.configure(state="disabled")
         self.log_cleaner(self.t("starting"))
         
         for widget in self.frame_results.winfo_children():
             widget.destroy()
+        self.frame_results.configure(label_text="") # Reset header
         self.check_vars.clear()
 
         self.cleaner.stop_event.clear()
@@ -676,12 +711,18 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
             self.log_cleaner(f"Error: {e}")
         finally:
             self.btn_scan.configure(state="normal")
+            self.after(0, lambda: self.cleaner_progress_container.grid_forget())
 
     def display_duplicates(self):
         if not self.duplicates:
+            self.frame_results.configure(label_text="")
             lbl = ctk.CTkLabel(self.frame_results, text=self.t("no_duplicates"))
             lbl.pack(pady=10)
             return
+
+        # Show header and actions frame now that scan is done and duplicates found
+        self.frame_results.configure(label_text=self.t("duplicates_found"))
+        self.frame_cleaner_actions.grid(row=2, column=0, padx=25, pady=(0, 5), sticky="ew")
 
         for i, group in enumerate(self.duplicates):
             frame_group = ctk.CTkFrame(self.frame_results)
@@ -695,10 +736,22 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
                 frame_file.pack(fill="x", padx=10, pady=2)
                 
                 var = ctk.BooleanVar()
+                var.trace_add("write", lambda *args: self.update_selection_states())
                 self.check_vars[file_path] = var
                 
                 chk = ctk.CTkCheckBox(frame_file, text=os.path.basename(file_path), variable=var)
                 chk.pack(side="left", padx=5, pady=2)
+        
+        self.update_selection_states()
+
+    def update_selection_states(self):
+        any_selected = any(var.get() for var in self.check_vars.values())
+        if any_selected:
+            self.btn_deselect_all.configure(state="normal")
+            self.btn_delete_selected.configure(state="normal")
+        else:
+            self.btn_deselect_all.configure(state="disabled")
+            self.btn_delete_selected.configure(state="disabled")
 
     def select_all_duplicates(self):
         for var in self.check_vars.values():
@@ -707,6 +760,16 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
     def deselect_all_duplicates(self):
         for var in self.check_vars.values():
             var.set(False)
+
+    def select_others_keep_one(self):
+        """Keeping the first image of each group, selecting others for deletion."""
+        for group in self.duplicates:
+            if len(group) > 1:
+                # First one
+                self.check_vars[group[0]].set(False)
+                # Others
+                for i in range(1, len(group)):
+                    self.check_vars[group[i]].set(True)
 
     def delete_selected_duplicates(self):
         selected_files = [path for path, var in self.check_vars.items() if var.get()]
